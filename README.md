@@ -1,2 +1,5 @@
-# api_server_update_new.com
-server update
+{"Version":"1.0"}
+
+روبیکای ما : vps_plus@
+سرور آپدیت 
+بهترین گزینه برای اسکچور
