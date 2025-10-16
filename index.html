@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="fa">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>پنجرهٔ شناور اینترنت — تک‌فایل</title>
+<style>
+  :root{--bg:#f4f6f8;--card:#fff;--accent:#2563eb;--muted:#64748b}
+  body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial;margin:0;background:var(--bg);color:#0f172a}
+  .wrap{max-width:980px;margin:28px auto;padding:18px}
+  h1{font-size:20px;margin:0 0 8px}
+  p{margin:6px 0;color:var(--muted)}
+  .controls{display:flex;gap:8px;align-items:center;margin:12px 0 18px}
+  input[type=number]{width:110px;padding:6px;border-radius:6px;border:1px solid #e2e8f0}
+  button{background:var(--accent);color:#fff;border:0;padding:8px 10px;border-radius:8px;cursor:pointer}
+  button.ghost{background:#fff;color:var(--accent);border:1px solid #cbd5e1}
+  .small{padding:6px 8px;font-size:13px}
+  .muted{color:var(--muted);font-size:13px}
+
+  /* ویجت شناور */
+  #internetWidget{
+    position:fixed; right:18px; bottom:18px; width:300px;
+    background:var(--card); border:1px solid #e6eefb; box-shadow:0 12px 30px rgba(15,23,42,0.08);
+    padding:12px; border-radius:12px; z-index:999999; display:none;
+    user-select:none;
+  }
+  #internetWidget header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  #internetWidget header h3{margin:0;font-size:15px}
+  #poolValue{font-weight:700;font-size:18px;margin-top:8px}
+  .row{display:flex;gap:8px;align-items:center;margin-top:10px}
+  .tiny{font-size:12px;padding:6px 8px;border-radius:8px}
+  .status{font-size:12px;color:var(--muted);margin-top:6px}
+
+  /* drag style */
+  .drag-handle{cursor:grab;padding:6px;border-radius:8px}
+  .drag-handle:active{cursor:grabbing}
+  a.link{color:var(--accent);text-decoration:none;font-size:13px}
+  footer{margin-top:18px;font-size:13px;color:var(--muted)}
+  pre{background:#0f172a;color:#fff;padding:10px;border-radius:8px;overflow:auto}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>پنجرهٔ شناور اینترنت — تک‌فایل</h1>
+    <p>این نسخهٔ تک‌فایلی دو حالت دارد: <strong>Local</strong> (بدون نیاز به سرور — پیش‌فرض) و <strong>Realtime</strong> (با Socket.IO سرور). برای تست سریع لوکال کافیست همین فایل را باز کنی.</p>
+
+    <div class="controls">
+      <label class="muted">مقدار برای افزودن (واحد آزمایشی):
+        <input id="addInput" type="number" value="100" min="0" />
+      </label>
+      <button id="giveBtn">دادن به سایت</button>
+
+      <label class="muted">مقدار مصرف (برای بازی):
+        <input id="useInput" type="number" value="20" min="0" />
+      </label>
+      <button id="useBtn" class="small">درخواست استفاده</button>
+
+      <button id="toggleWidget" class="ghost small">نمایش پنجرهٔ شناور</button>
+    </div>
+
+    <div class="muted">حالت فعلی: <span id="modeLabel">Local (بدون سرور)</span></div>
+    <div style="margin-top:12px">
+      <label class="muted">اگر می‌خواهی به سرور متصل شوی، اینجا آدرس Socket.IO سرور را بزن (مثلاً <code>https://your-server.com</code>)</label><br>
+      <input id="serverUrl" type="text" placeholder="خالی بگذار برای حالت Local" style="width:100%;margin-top:6px;padding:8px;border-radius:8px;border:1px solid #e2e8f0" />
+      <div style="margin-top:8px;display:flex;gap:8px;">
+        <button id="connectBtn" class="small">اتصال به سرور</button>
+        <button id="disconnectBtn" class="small ghost">قطع اتصال</button>
+      </div>
+    </div>
+
+    <footer>
+      <div class="muted">ذخیره‌ی مقدار در مرورگر (localStorage). برای سینک بین کاربران نیاز به Socket.IO سرور داری.</div>
+    </footer>
+
+    <hr style="margin-top:18px"/>
+
+    <h3>راهنمای سریع</h3>
+    <ul class="muted">
+      <li>در حالت Local: وقتی «دادن به سایت» را میزنی، موجودی در مرورگر ذخیره می‌شود و نمای پنجرهٔ شناور آن را نشان می‌دهد.</li>
+      <li>در حالت Realtime: اگر یک سرور Socket.IO راه‌اندازی کنی و آدرسش را وارد کنی، مقدار بین همهٔ کلاینت‌های متصل همگام می‌شود.</li>
+      <li>برای استفادهٔ واقعی از اینترنت در بازی نیاز به یک تونل/پراکسی (مثلاً WireGuard یا SOCKS5) و سرور داری؛ این صفحه صرفاً مدیریت و UX را فراهم می‌کند.</li>
+    </ul>
+  </div>
+
+  <!-- ویجت شناور -->
+  <div id="internetWidget" aria-hidden="true">
+    <header>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="drag-handle" id="dragHandle" title="جابجایی پنجره">☰</div>
+        <h3>اینترنت سایت</h3>
+      </div>
+      <div><button id="closeWidget" class="tiny">×</button></div>
+    </header>
+
+    <div id="poolValue">موجودی: <span id="poolNum">0</span></div>
+    <div class="status" id="widgetStatus">وضعیت: آماده</div>
+
+    <div class="row">
+      <input id="widgetUse" type="number" value="10" style="flex:1;padding:6px;border-radius:8px;border:1px solid #eef2ff" />
+      <button id="widgetUseBtn" class="tiny">استفاده</button>
+    </div>
+
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button id="refreshWidget" class="tiny">رفرش</button>
+      <button id="openLog" class="tiny ghost">نمایش لاگ</button>
+    </div>
+
+    <div id="widgetLog" style="margin-top:10px;display:none;max-height:180px;overflow:auto"></div>
+  </div>
+
+  <!-- socket.io client CDN (فقط در صورت استفاده از سرور) -->
+  <script id="socketIoScript" src=""></script>
+
+  <script>
+  (function(){
+    // === پیکربندی اولیه ===
+    const STORAGE_KEY = 'internet_pool_value_v1';
+    const LOG_KEY = 'internet_pool_log_v1';
+
+    // حالت: 'local' یا 'server'
+    let mode = 'local';
+    let socket = null;
+
+    // عناصر
+    const addInput = document.getElementById('addInput');
+    const giveBtn = document.getElementById('giveBtn');
+    const useInput = document.getElementById('useInput');
+    const useBtn = document.getElementById('useBtn');
+    const toggleWidget = document.getElementById('toggleWidget');
+    const internetWidget = document.getElementById('internetWidget');
+    const poolNum = document.getElementById('poolNum');
+    const widgetUse = document.getElementById('widgetUse');
+    const widgetUseBtn = document.getElementById('widgetUseBtn');
+    const widgetStatus = document.getElementById('widgetStatus');
+    const openLog = document.getElementById('openLog');
+    const widgetLog = document.getElementById('widgetLog');
+    const refreshWidget = document.getElementById('refreshWidget');
+    const closeWidget = document.getElementById('closeWidget');
+    const dragHandle = document.getElementById('dragHandle');
+
+    const serverUrlInput = document.getElementById('serverUrl');
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const modeLabel = document.getElementById('modeLabel');
+
+    // مقدار Pool در local (واحد آزمایشی)
+    function getLocalPool(){
+      return Number(localStorage.getItem(STORAGE_KEY) || 0);
+    }
+    function setLocalPool(v){
+      localStorage.setItem(STORAGE_KEY, String(Math.max(0, Math.floor(v))));
+    }
+
+    // لاگ در مرورگر
+    function pushLog(msg){
+      const now = new Date().toLocaleString();
+      const arr = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+      arr.unshift(`[${now}] ${msg}`);
+      localStorage.setItem(LOG_KEY, JSON.stringify(arr.slice(0,200)));
+      renderLog();
+    }
+    function renderLog(){
+      const arr = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+      if(arr.length===0){ widgetLog.innerHTML = '<div class="muted">لاگ خالی است</div>'; return; }
+      widgetLog.innerHTML = '<pre>' + arr.join('\n') + '</pre>';
+    }
+
+    // نمایش مقدار
+    function renderPool(v){
+      poolNum.innerText = Number(v).toLocaleString();
+    }
+
+    // init
+    renderPool(getLocalPool());
+    renderLog();
+
+    // دکمه‌ها
+    giveBtn.addEventListener('click', () => {
+      const n = Number(addInput.value) || 0;
+      if(n <= 0) return alert('مقدار مثبت وارد کن');
+      if(mode === 'local'){
+        const cur = getLocalPool();
+        const next = cur + n;
+        setLocalPool(next);
+        renderPool(next);
+        pushLog(`+${n} به سایت داده شد (Local) — موجودی: ${next}`);
+      } else {
+        socket.emit('giveInternet', n);
+      }
+    });
+
+    useBtn.addEventListener('click', () => {
+      const n = Number(useInput.value) || 0;
+      if(n <= 0) return alert('مقدار مثبت وارد کن');
+      if(mode === 'local'){
+        const cur = getLocalPool();
+        if(cur >= n){
+          const next = cur - n;
+          setLocalPool(next);
+          renderPool(next);
+          pushLog(`-${n} استفاده شد (Local) — موجودی: ${next}`);
+          alert('اینترنت به بازی منتقل شد: ' + n);
+        } else {
+          alert('موجودی کافی نیست');
+        }
+      } else {
+        socket.emit('useInternet', n);
+      }
+    });
+
+    // ویجت
+    toggleWidget.addEventListener('click', () => {
+      internetWidget.style.display = internetWidget.style.display === 'block' ? 'none' : 'block';
+      internetWidget.setAttribute('aria-hidden', internetWidget.style.display !== 'block');
+    });
+    closeWidget.addEventListener('click', () => { internetWidget.style.display = 'none'; internetWidget.setAttribute('aria-hidden', 'true'); });
+
+    widgetUseBtn.addEventListener('click', () => {
+      const n = Number(widgetUse.value) || 0;
+      if(n <= 0) return alert('مقدار مثبت وارد کن');
+      if(mode === 'local'){
+        const cur = getLocalPool();
+        if(cur >= n){
+          const next = cur - n;
+          setLocalPool(next);
+          renderPool(next);
+          pushLog(`(ویجت) -${n} استفاده شد — موجودی: ${next}`);
+          widgetStatus.innerText = 'اینترنت منتقل شد: ' + n;
+          setTimeout(()=> widgetStatus.innerText = 'وضعیت: آماده', 2000);
+          alert('اینترنت به بازی منتقل شد: ' + n);
+        } else {
+          alert('موجودی کافی نیست');
+        }
+      } else {
+        socket.emit('useInternet', n);
+      }
+    });
+
+    refreshWidget.addEventListener('click', () => {
+      if(mode === 'local') renderPool(getLocalPool());
+      widgetStatus.innerText = 'رفرش شد';
+      setTimeout(()=> widgetStatus.innerText = 'وضعیت: آماده', 1200);
+    });
+
+    openLog.addEventListener('click', () => {
+      widgetLog.style.display = widgetLog.style.display === 'block' ? 'none' : 'block';
+      if(widgetLog.style.display === 'block') renderLog();
+    });
+
+    // دراگ کردن ساده
+    (function(){
+      let dragging=false, startX=0, startY=0, startRight=0, startBottom=0;
+      dragHandle.addEventListener('mousedown', e => {
+        dragging = true;
+        startX = e.clientX; startY = e.clientY;
+        const rect = internetWidget.getBoundingClientRect();
+        startRight = window.innerWidth - rect.right;
+        startBottom = window.innerHeight - rect.bottom;
+        document.body.style.userSelect='none';
+      });
+      window.addEventListener('mousemove', e => {
+        if(!dragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        internetWidget.style.right = (startRight - dx) + 'px';
+        internetWidget.style.bottom = (startBottom - dy) + 'px';
+      });
+      window.addEventListener('mouseup', () => { dragging=false; document.body.style.userSelect=''; });
+    })();
+
+    // ============= Socket.IO (حالت سرور) =============
+    // تابع اتصال به سرور (Socket.IO)
+    function loadSocketIoAndConnect(url){
+      if(!url) { alert('آدرس سرور خالی است'); return; }
+      // بارگذاری اسکریپت socket.io client به صورت داینامیک
+      const script = document.getElementById('socketIoScript');
+      script.src = url.replace(/\/$/, '') + '/socket.io/socket.io.js';
+      script.onload = () => {
+        try{
+          socket = io(url);
+        }catch(e){
+          alert('خطا در ساخت socket.io client: ' + e.message);
+          return;
+        }
+        setupSocketEvents();
+      };
+      script.onerror = () => {
+        alert('بارگذاری socket.io از سرور انجام نشد. مطمئن شو سرور Socket.IO را سرو می‌کند و دسترسی CORS دارد.');
+      };
+    }
+
+    function setupSocketEvents(){
+      if(!socket) return;
+      mode = 'server';
+      modeLabel.innerText = 'Server (Realtime)';
+      pushLog('حالت سرور فعال شد — متصل به ' + serverUrlInput.value);
+      socket.on('connect', ()=> {
+        console.log('socket connected', socket.id);
+        widgetStatus.innerText = 'متصل به سرور';
+      });
+      socket.on('disconnect', ()=> {
+        widgetStatus.innerText = 'قطع اتصال';
+        mode = 'local';
+        modeLabel.innerText = 'Local (بدون سرور)';
+        pushLog('قطع اتصال از سرور');
+      });
+      // بروزرسانی pool از سرور
+      socket.on('updatePool', amt => {
+        renderPool(amt);
+        pushLog('بروزرسانی از سرور: موجودی ' + amt);
+      });
+      // پاسخ درخواست استفاده
+      socket.on('internetGranted', data => {
+        if(data && data.success){
+          alert('اینترنت به بازی منتقل شد (server): ' + data.amount);
+          pushLog('(سرور) اینترنت منتقل شد: ' + data.amount);
+        } else {
+          alert('سرور: اینترنت کافی نیست یا خطا');
+          pushLog('(سرور) تلاش برای استفاده ناموفق');
+        }
+      });
+      // در صورت تمایل می‌توان رویدادهای بیشتری اضافه کرد
+    }
+
+    connectBtn.addEventListener('click', () => {
+      const url = serverUrlInput.value.trim();
+      if(!url) return alert('آدرس سرور را وارد کن');
+      loadSocketIoAndConnect(url);
+    });
+    disconnectBtn.addEventListener('click', () => {
+      if(socket){ socket.disconnect(); socket = null; }
+      mode = 'local';
+      modeLabel.innerText = 'Local (بدون سرور)';
+      pushLog('حالت Local (قطع شد)');
+    });
+
+    // اگر سرور فعال شد، ارسال رویدادهای give/use به سرور
+    // (در کد بالا، give/use دکمه‌ها به طور خودکار socket.emit می‌کنند وقتی mode === 'server')
+
+    // اگر کاربر صفحه را مجدداً باز کند، مقدار Local را نمایش بده
+    window.addEventListener('load', () => { renderPool(getLocalPool()); renderLog(); });
+
+    // در صورت استفاده از حالت Server، همزمان local را پاک نکن — می‌توانی سیاست متفاوتی در آینده انتخاب کنی.
+  })();
+  </script>
+</body>
+</html>
